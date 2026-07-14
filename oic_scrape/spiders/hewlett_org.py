@@ -10,7 +10,7 @@ FUNDER_ORG_ROR_ID = "https://ror.org/04hd1y677"
 class HewlettOrgSpider(SitemapSpider):
     name = "hewlett.org_grants"
     allowed_domains = ["hewlett.org"]
-    sitemap_urls = ["https://hewlett.org/sitemap.xml"]
+    sitemap_urls = ["https://hewlett.org/sitemap.xml"],
     sitemap_rules = [("/grants/", "parse_grant")]
 
     def parse_grant(self, response):

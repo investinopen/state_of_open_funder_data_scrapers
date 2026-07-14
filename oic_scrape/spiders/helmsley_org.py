@@ -13,7 +13,7 @@ FUNDER_NAME = "Leona M. and Harry B. Helmsley Charitable Trust"
 class HelmsleyOrgSitemapSpider(SitemapSpider):
     name = "helmsley.org_grants"
     allowed_domains = ["helmsleytrust.org"]
-    sitemap_urls = ["https://helmsleytrust.org/sitemap.xml"]
+    sitemap_urls = ["https://helmsleytrust.org/sitemap_index.xml"]
     sitemap_rules = [
         ('/grants/', 'parse_grant'),
     ]

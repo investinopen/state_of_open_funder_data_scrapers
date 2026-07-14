@@ -26,7 +26,9 @@ class ImlsGovSpider(scrapy.Spider):
             yield response.follow(grant_link, self.parse_grant)
 
         # Following the pagination link
-        next_page = response.css(".pager__item--next a::attr(href)").get()
+        next_page = response.css(".usa-pagination__arrow a::attr(href)").get()
+        print("\nSEARCHING FOR NEXT PAGE\n\n")
+        print(next_page, '\n')
         if next_page is not None:
             yield response.follow(next_page, self.parse)
 

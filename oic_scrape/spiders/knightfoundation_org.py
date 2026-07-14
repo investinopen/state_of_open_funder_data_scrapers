@@ -1,12 +1,16 @@
 import scrapy
 import json
 from datetime import datetime
+
+from scrapy.spidermiddlewares.httperror import HttpError
+from twisted.internet.error import DNSLookupError
+
 from oic_scrape.items import AwardItem, AwardParticipant
 import logging
 from urllib.parse import urlparse, parse_qs
 
 class KnightFoundationSpider(scrapy.Spider):
-    name = "knightfoundation_org_grants"
+    name = "knightfoundation.org_grants"
     allowed_domains = ["knightfoundation.org"]
     start_urls = ["https://knightfoundation.org/wp-json/knight-foundation-app/v1/grants?per_page=100&page=1&_locale=user"]
     

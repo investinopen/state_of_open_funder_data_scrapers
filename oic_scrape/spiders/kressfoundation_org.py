@@ -9,7 +9,7 @@ FUNDER_ORG_NAME = "Samuel H. Kress Foundation"
 FUNDER_ORG_ROR_ID = "https://ror.org/00akqa526"
 
 class KressFoundationSpider(scrapy.Spider):
-    name = "kressfoundation_org_grants"
+    name = "kressfoundation.org_grants"
     allowed_domains = ["kressfoundation.org"]
     start_urls = ["https://www.kressfoundation.org/Programs/Past-Grants-Fellowships"]
 

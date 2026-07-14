@@ -1,3 +1,4 @@
+import pytz
 import scrapy
 import json
 from oic_scrape.items import AwardItem
@@ -23,7 +24,7 @@ class ChanzuckerbergComSpider(scrapy.Spider):
     start_urls = ["https://chanzuckerberg.com/wp-json/czi/v1/grants/"]
 
     def parse(self, response):
-        timestamp = datetime.datetime.utcnow()
+        timestamp = datetime.datetime.now(tz=pytz.UTC)
         r = json.loads(response.text)
         grants = r["grants"][0]
 
@@ -43,8 +44,8 @@ class ChanzuckerbergComSpider(scrapy.Spider):
                 source="chanzuckerberg.com",
                 source_url="https://chanzuckerberg.com/grants-ventures/grants/",
                 grant_description=raw_source_data["Grant Purpose"],
-                program_of_funder=raw_source_data["Initiative & Program Text"],
-                comments=f"funding_entity={raw_source_data['Funding Entity']}",
+                program_of_funder='; '.join([str(s) for s in raw_source_data["Initiative"]]),
+                # comments=f"funding_entity={raw_source_data['Funding Entity']}",
                 _crawled_at=timestamp,
                 raw_source_data=str(raw_source_data),
             )

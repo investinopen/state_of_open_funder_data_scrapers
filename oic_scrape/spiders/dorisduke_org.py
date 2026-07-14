@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 import scrapy
 import json
 from oic_scrape.items import AwardItem
-from datetime import datetime
+from datetime import datetime, timezone
 
 # NOTE: In the current iteration, this scraper does not handle multiple-listing grant pages
 # Examples:
@@ -30,16 +30,28 @@ class DorisdukeOrgSpider(scrapy.Spider):
         https://www.dorisduke.org/grants/what-weve-funded/?1=1&GrantProgramID=5&GrantInitiativeID=0&GrantDate=0&GrantShow=12&GrantSortBy=0#grant-filter
         """
         scripts = response.css('script::text').getall()
+        grants = []
         for script in scripts:
-            if "var grants = [" in script:
-                script_content = script 
+            if '\\"grants\\":' in script:
+                script_content = script
+                # grants.append(json.loads(script_content))
         # Extract the relevant portion of the JavaScript
-        start_index = script_content.find('var grants = ') + len('var grants = ')
-        end_index = script_content.find(';;')  # Assuming ';;' marks the end consistently
-        json_data = script_content[start_index:end_index]
+                start_index = script_content.find('\\"grants\\":') + len('\\"grants\\":')
+                end_index = script_content.rfind('\\"}]') + len('\\"}]')  # Assuming '}]}]\n' marks the end consistently
+                print(f"Start index: {start_index}, End index: {end_index}")
+                json_text = script_content[start_index:end_index].replace('\\"', '"')
+                # json_data = json.loads(json_data)
+                # grants.append(json_data)
+                try:
+                    grants.extend(json.loads(json_text))
+                except json.decoder.JSONDecodeError as e:
+                    if json_text.endswith(',"children":"$L2b"}]'):
+                        json_text = json_text.replace(',"children":"$L2b"}]', '')
+                        grants.extend(json.loads(json_text))
+                    else: print(e)
 
         # Load the grants as json
-        grants = json.loads(json_data)
+        # grants = json.loads(json_data)
         return grants if grants else None
     
     
@@ -52,45 +64,52 @@ class DorisdukeOrgSpider(scrapy.Spider):
         # Process the grants
         if all_grants:
             for grant in all_grants:
-                grant_url = grant[3]  # Assuming the index is correct
-                yield scrapy.Request(response.urljoin(grant_url), callback=self.parse_grant_page)
+                yield self.parse_grant(grant)
             
-    def parse_grant_page(self, response):
-        crawl_ts = datetime.utcnow()
+    def parse_grant(self, grant):
+        crawl_ts = datetime.now(tz=timezone.utc)
         source_data = {}
-        source_data['url'] = response.url
-        source_data['recipient_org_name'] = response.css('.ddcf-text--heading-hero-text::text').get()
+        source_data['url'] = grant.get('Current URL')
+        source_data['recipient_org_name'] = grant.get('Organization Name')
 
-        award_content = response.css('.ddcf-module--content-wysiwyg')
-        content_paragraphs = award_content.css('p')
+        # award_content = grant.get('Description')
+        # content_paragraphs = award_content.css('p')
 
-        source_data['awarded_on'] = content_paragraphs[0].css('::text').get().strip()
-        source_data['amount_duration'] = content_paragraphs[1].css('::text').get().strip()
+        source_data['awarded_on'] = grant.get('Date')
+        source_data['duration'] = grant.get('Duration')
 
-        description = ""
-        for paragraph in content_paragraphs[2:-1]:
-            paragraph_text = paragraph.css('::text').get()
-            if paragraph_text:
-                description += paragraph_text.strip() + " "
-        if len(description) > 1:
-            description = description.strip()
+        # description = ""
+        # for paragraph in content_paragraphs[2:-1]:
+        #     paragraph_text = paragraph.css('::text').get()
+        #     if paragraph_text:
+        #         description += paragraph_text.strip() + " "
+        # if len(description) > 1:
+        #     description = description.strip()
         
-        source_data['description'] = description
+        source_data['description'] = grant.get('Description')
+        source_data['program'] = grant.get('Program')
 
-        source_data['project_url'] = content_paragraphs[-1].css('a::attr(href)').get()
+        source_data['project_url'] = grant.get('Grantee Site')
 
         # Format fields
         date_str = source_data['awarded_on'].replace("Awarded: ", "")
-        start_date = datetime.strptime(date_str, "%b %d, %Y")
+        start_date = datetime.strptime(date_str, "%Y-%m-%d")
 
-        amount_str = source_data['amount_duration'].split(" ")[0]
-        award_amount = float(amount_str.replace("$", "").replace(",", ""))
+        source_data['amount_str'] = grant.get('Amount')
+        try:
+            award_amount = float(source_data['amount_str'].replace("$", "").replace(",", ""))
+        except ValueError as e:
+            if source_data['amount_str'].endswith('million'):
+                award_amount = float(source_data['amount_str'].replace("$", "").replace(" million", ""))*1e6
+            else:
+                print('ValueError:', e)
+                award_amount = 0.0
 
-        duration = source_data['amount_duration'].split("over ")[-1]
+        duration = source_data['duration']
 
         award = AwardItem(
             _crawled_at = crawl_ts,
-            grant_id = f"dorisduke:grants::{source_data['url']}",
+            grant_id = f"dorisduke:grants::{grant.get('Current URL')}",
             funder_org_name = FUNDER_ORG_NAME,
             funder_org_ror_id = FUNDER_ORG_ROR_ID,
             recipient_org_name = source_data['recipient_org_name'],
@@ -103,7 +122,9 @@ class DorisdukeOrgSpider(scrapy.Spider):
             source = "dorrisduke.org",
             source_url = source_data['url'],
             grant_description = source_data['description'],
+            program_of_funder=source_data['program'],
+            raw_source_data=grant
         )
 
-        yield award
+        return award
         
